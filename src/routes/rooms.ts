@@ -92,7 +92,7 @@ roomsRouter.post('/', requireAuth, async (req: Request, res: Response) => {
 roomsRouter.post('/:id/join', requireAuth, async (req: Request, res: Response) => {
   const userId = req.session.userId!;
   const roomId = parseInt(req.params.id as string);
-  const { asSpectator = false } = req.body;
+  const { asSpectator = false } = req.body ?? {};
 
   try {
     const roomResult = await query('SELECT * FROM rooms WHERE id = $1', [roomId]);
