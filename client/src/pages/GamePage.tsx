@@ -213,8 +213,8 @@ export default function GamePage() {
 
       {error && <p className="error" style={{ marginBottom: 8 }}>{error}</p>}
       
-      {/* 死亡者・観戦者は常にロビーへ戻れる */}
-      {(!isAlive || myRole === 'spectator') && phase !== 'game_over' && (
+      {/* 観戦者は常にロビーへ戻れる */}
+      {myRole === 'spectator' && phase !== 'game_over' && (
         <div style={{ marginBottom: 8 }}>
           <button
             onClick={() => navigate('/lobby')}
