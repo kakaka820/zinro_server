@@ -10,6 +10,7 @@ type Member = {
   handle_name: string;
   is_ready?: boolean;
   is_spectator?: boolean;
+  is_bot?: boolean;
 };
 
 type RoomDetail = {
@@ -63,6 +64,14 @@ export default function RoomPage() {
     socketRef.current.on('game_started', (data: { gameId: number }) => {
       navigate(`/game/${data.gameId}`);
     });
+
+    socketRef.current.on('kicked', ({ userId: kickedId }: { userId: number }) => {
+      if (kickedId === user?.id) {
+        alert('キックされました');
+        navigate('/lobby');
+      }
+    });
+
 
     return () => {
       socketRef.current?.emit('leave_room', { roomId: id, userId: user?.id });
@@ -130,10 +139,22 @@ export default function RoomPage() {
                    {m.is_spectator && (
                     <span style={{ color: '#888', fontSize: 11, marginLeft: 6 }}>👁 観戦</span>
                   )}
+                  {m.is_bot && <span style={{ color: '#a78bfa', fontSize: 11, marginLeft: 6 }}>🤖 Bot</span>}
                   {m.id === user?.id && (
                     <span style={{ color: '#7ec8e3', fontSize: 11, marginLeft: 6 }}>(あなた)</span>
                   )}
                 </td>
+                 <td style={{ padding: '6px 8px', textAlign: 'right' }}>
+                    {isOwner && m.id !== user?.id && (
+                      <button
+                        onClick={() => api.post(`/api/rooms/${id}/kick`, { targetUserId: m.id })
+                          .catch(err => setError(err.message))}
+                        style={{ fontSize: 11, color: '#f87171', borderColor: '#7f1d1d', background: 'transparent' }}
+                      >
+                        キック
+                      </button>
+                    )}
+                  </td>
               </tr>
             ))}
           </tbody>
@@ -142,6 +163,15 @@ export default function RoomPage() {
 
       {/* 開始ボタン or 待機メッセージ */}
       <div style={{ marginTop: 20 }}>
+        {isOwner && (
+          <button
+            onClick={() => api.post(`/api/rooms/${id}/add-bot`)
+              .catch(err => setError(err instanceof Error ? err.message : 'Bot追加失敗'))}
+            style={{ fontSize: 12, marginBottom: 8, display: 'block' }}
+          >
+            🤖 Bot を追加
+          </button>
+        )}
         {isOwner ? (
           <div>
             {!canStart && (
