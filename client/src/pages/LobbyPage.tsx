@@ -18,6 +18,7 @@ export default function LobbyPage() {
   const [rooms, setRooms] = useState<Room[]>([]);
   const [newRoomName, setNewRoomName] = useState('');
   const [maxPlayers, setMaxPlayers] = useState(8);
+  const [ownerIsSpectator, setOwnerIsSpectator] = useState(false);
   const [error, setError] = useState('');
   const [showCreate, setShowCreate] = useState(false);
 
@@ -42,6 +43,7 @@ export default function LobbyPage() {
       const res = await api.post<Room>('/api/rooms', {
         name: newRoomName || `${user?.handleName}の部屋`,
         maxPlayers,
+        ownerIsSpectator,
       });
       navigate(`/room/${res.data.id}`);
     } catch (err: unknown) {
@@ -103,10 +105,22 @@ export default function LobbyPage() {
                 ))}
               </select>
             </div>
-            <button type="submit">作成</button>
-          </form>
-        )}
-      </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <input
+              type="checkbox"
+              id="spectator"
+              checked={ownerIsSpectator}
+              onChange={e => setOwnerIsSpectator(e.target.checked)}
+            />
+            <label htmlFor="spectator" style={{ fontSize: 13, color: '#aaa' }}>
+              観戦状態で作成する
+            </label>
+          </div>
+          <button type="submit">作成</button>
+                      <button type="submit">作成</button>
+                    </form>
+                  )}
+                </div>
 
       {/* 部屋一覧 */}
       <div>
