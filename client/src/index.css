@@ -1,0 +1,37 @@
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  font-family: 'MS Gothic', 'Osaka', monospace;
+  background: #1a1a2e;
+  color: #e0e0e0;
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+a { color: #7ec8e3; }
+a:hover { text-decoration: underline; }
+
+button {
+  cursor: pointer;
+  background: #2a2a4a;
+  color: #e0e0e0;
+  border: 1px solid #4a4a7a;
+  padding: 4px 12px;
+  font-size: 13px;
+}
+button:hover { background: #3a3a6a; }
+
+input, select {
+  background: #111128;
+  color: #e0e0e0;
+  border: 1px solid #4a4a7a;
+  padding: 4px 8px;
+  font-size: 13px;
+  width: 100%;
+}
+
+.container { max-width: 900px; margin: 0 auto; padding: 16px; }
+.error   { color: #ff6b6b; font-size: 13px; margin-top: 4px; }
+.success { color: #6bffb8; font-size: 13px; margin-top: 4px; }
+
+hr { border: none; border-top: 1px solid #2a2a4a; margin: 12px 0; }
