@@ -159,7 +159,35 @@ roomsRouter.post('/:id/leave', requireAuth, async (req: Request, res: Response) 
       'DELETE FROM room_members WHERE room_id = $1 AND user_id = $2',
       [roomId, userId]
     );
-    res.json({ message: '退室しました' });
+
+    // 残りメンバー数を確認
+    const remaining = await query(
+      'SELECT COUNT(*) FROM room_members WHERE room_id = $1',
+      [roomId]
+    );
+    const remainingCount = parseInt(remaining.rows[0].count);
+
+    if (remainingCount === 0) {
+      // 誰もいなくなった → 部屋ごと削除
+      await query('DELETE FROM rooms WHERE id = $1', [roomId]);
+      res.json({ message: '村を閉じました', roomClosed: true });
+      return;
+    }
+
+    // オーナーが退室した場合、オーナー権限を次の人に移譲
+    const roomResult = await query('SELECT owner_id FROM rooms WHERE id = $1', [roomId]);
+    if (roomResult.rows.length > 0 && roomResult.rows[0].owner_id === userId) {
+      const newOwner = await query(
+        'SELECT user_id FROM room_members WHERE room_id = $1 LIMIT 1',
+        [roomId]
+      );
+      if (newOwner.rows.length > 0) {
+        await query('UPDATE rooms SET owner_id = $1 WHERE id = $2',
+          [newOwner.rows[0].user_id, roomId]);
+      }
+    }
+
+    res.json({ message: '退室しました', roomClosed: false });
   } catch (e) {
     console.error(e);
     res.status(500).json({ error: 'サーバーエラー' });
