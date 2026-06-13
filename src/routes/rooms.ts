@@ -1,13 +1,17 @@
 // src/routes/room.ts
 
 import { Router, Request, Response } from 'express';
+import { Server } from 'socket.io';
 import { query } from '../db';
 import { requireAuth } from '../middleware/auth';
 
-export const roomsRouter = Router();
+const BOT_NAMES = ['甲', '乙', '丙', '丁', '戊', '寅さん', '金さん', '銀さん', '権兵衛', 'マミ'];
+
+export const createRoomsRouter = (io: Server) => {
+  const router = Router();
 
 // ─── ルーム一覧 GET /api/rooms ───
-roomsRouter.get('/', async (_req, res: Response) => {
+router.get('/', async (_req, res: Response) => {
   try {
     const result = await query(`
       SELECT
@@ -29,7 +33,7 @@ roomsRouter.get('/', async (_req, res: Response) => {
 });
 
 // ─── ルーム詳細 GET /api/rooms/:id ───
-roomsRouter.get('/:id', async (req: Request, res: Response) => {
+router.get('/:id', async (req: Request, res: Response) => {
   try {
     const roomResult = await query(
       `SELECT r.*, u.handle_name AS owner_name
@@ -43,7 +47,7 @@ roomsRouter.get('/:id', async (req: Request, res: Response) => {
       return;
     }
     const membersResult = await query(
-      `SELECT u.id, u.handle_name, u.rating, rm.is_spectator
+      `SELECT u.id, u.handle_name, u.rating, rm.is_spectator, u.is_bot
        FROM room_members rm
        JOIN users u ON rm.user_id = u.id
        WHERE rm.room_id = $1`,
@@ -57,7 +61,7 @@ roomsRouter.get('/:id', async (req: Request, res: Response) => {
 });
 
 // ─── ルーム作成 POST /api/rooms ───
-roomsRouter.post('/', requireAuth, async (req: Request, res: Response) => {
+router.post('/', requireAuth, async (req: Request, res: Response) => {
   const { maxPlayers = 10, roleConfig = {}, ownerIsSpectator = false, name = '新しい村' } = req.body;
   const userId = req.session.userId!;
 
@@ -89,7 +93,7 @@ roomsRouter.post('/', requireAuth, async (req: Request, res: Response) => {
 });
 
 // ─── 入室 POST /api/rooms/:id/join ───
-roomsRouter.post('/:id/join', requireAuth, async (req: Request, res: Response) => {
+router.post('/:id/join', requireAuth, async (req: Request, res: Response) => {
   const userId = req.session.userId!;
   const roomId = parseInt(req.params.id as string);
   const { asSpectator = false } = req.body ?? {};
@@ -151,7 +155,7 @@ roomsRouter.post('/:id/join', requireAuth, async (req: Request, res: Response) =
 });
 
 // ─── 退室 POST /api/rooms/:id/leave ───
-roomsRouter.post('/:id/leave', requireAuth, async (req: Request, res: Response) => {
+router.post('/:id/leave', requireAuth, async (req: Request, res: Response) => {
   const userId = req.session.userId!;
   const roomId = parseInt(req.params.id as string);
   try {
@@ -193,3 +197,66 @@ roomsRouter.post('/:id/leave', requireAuth, async (req: Request, res: Response) 
     res.status(500).json({ error: 'サーバーエラー' });
   }
 });
+
+  // ─── Bot追加 POST /api/rooms/:id/add-bot ───
+  router.post('/:id/add-bot', requireAuth, async (req: Request, res: Response) => {
+    const userId = req.session.userId!;
+    const roomId = parseInt(req.params.id as string);
+    try {
+      const roomResult = await query('SELECT * FROM rooms WHERE id = $1', [roomId]);
+      if (roomResult.rows.length === 0) { res.status(404).json({ error: 'ルームが見つかりません' }); return; }
+      const room = roomResult.rows[0];
+      if (room.owner_id !== userId) { res.status(403).json({ error: 'オーナーのみBotを追加できます' }); return; }
+
+      const countResult = await query(
+        'SELECT COUNT(*) FROM room_members WHERE room_id = $1 AND is_spectator = FALSE', [roomId]
+      );
+      if (parseInt(countResult.rows[0].count) >= room.max_players) {
+        res.status(400).json({ error: 'ルームが満員です' }); return;
+      }
+
+      const namesResult = await query(
+        `SELECT u.handle_name FROM room_members rm JOIN users u ON rm.user_id = u.id WHERE rm.room_id = $1`, [roomId]
+      );
+      const usedNames = new Set(namesResult.rows.map((r: { handle_name: string }) => r.handle_name));
+      const botName = BOT_NAMES.find(n => !usedNames.has(n)) ?? `Bot${Date.now()}`;
+
+      const botResult = await query(
+        `INSERT INTO users (handle_name, password_hash, is_bot) VALUES ($1, 'bot_no_password', TRUE) RETURNING id`,
+        [botName]
+      );
+      const botId = botResult.rows[0].id;
+      await query('INSERT INTO room_members (room_id, user_id, is_spectator) VALUES ($1, $2, FALSE)', [roomId, botId]);
+
+      io.to(`room:${roomId}`).emit('room_updated', { type: 'bot_added', botName });
+      res.json({ message: 'Botを追加しました', botId, name: botName });
+    } catch (e) { console.error(e); res.status(500).json({ error: 'サーバーエラー' }); }
+  });
+
+  // ─── キック POST /api/rooms/:id/kick ───
+  router.post('/:id/kick', requireAuth, async (req: Request, res: Response) => {
+    const userId = req.session.userId!;
+    const roomId = parseInt(req.params.id as string);
+    const { targetUserId } = req.body ?? {};
+    if (!targetUserId) { res.status(400).json({ error: 'targetUserIdが必要です' }); return; }
+
+    try {
+      const roomResult = await query('SELECT owner_id FROM rooms WHERE id = $1', [roomId]);
+      if (roomResult.rows.length === 0) { res.status(404).json({ error: 'ルームが見つかりません' }); return; }
+      if (roomResult.rows[0].owner_id !== userId) { res.status(403).json({ error: 'オーナーのみキックできます' }); return; }
+      if (targetUserId === userId) { res.status(400).json({ error: '自分自身はキックできません' }); return; }
+
+      const targetResult = await query('SELECT is_bot FROM users WHERE id = $1', [targetUserId]);
+      const isBot = targetResult.rows[0]?.is_bot;
+
+      await query('DELETE FROM room_members WHERE room_id = $1 AND user_id = $2', [roomId, targetUserId]);
+      if (isBot) await query('DELETE FROM users WHERE id = $1', [targetUserId]);
+
+      io.to(`room:${roomId}`).emit('kicked', { userId: targetUserId });
+      io.to(`room:${roomId}`).emit('room_updated', { type: 'user_kicked', userId: targetUserId });
+      res.json({ message: 'キックしました' });
+    } catch (e) { console.error(e); res.status(500).json({ error: 'サーバーエラー' }); }
+  });
+
+  return router;
+};
