@@ -14,6 +14,7 @@ import { setupSocket } from './socket/index';
 import { createGamesRouter } from './routes/games';
 import { betsRouter } from './routes/bets';
 import { resumeActiveTimers } from './game/timer';
+import path from 'path';
 
 
 
@@ -21,6 +22,14 @@ dotenv.config();
 
 const app = express();
 const httpServer = createServer(app);
+
+
+if (process.env.NODE_ENV === 'production') {
+  app.use(express.static(path.join(__dirname, '../client/dist')));
+  app.get('*', (_req, res) => {
+    res.sendFile(path.join(__dirname, '../client/dist/index.html'));
+  });
+}
 
 
 // Socket.io セットアップ
