@@ -111,8 +111,9 @@ export default function LobbyPage() {
               id="spectator"
               checked={ownerIsSpectator}
               onChange={e => setOwnerIsSpectator(e.target.checked)}
+              style={{ width: 'auto', cursor: 'pointer' }}
             />
-            <label htmlFor="spectator" style={{ fontSize: 13, color: '#aaa' }}>
+            <label htmlFor="spectator" style={{ fontSize: 13, color: '#aaa', cursor: 'pointer', whiteSpace: 'nowrap' }}>
               観戦状態で作成する
             </label>
           </div>
