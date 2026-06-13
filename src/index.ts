@@ -24,14 +24,6 @@ const app = express();
 const httpServer = createServer(app);
 
 
-if (process.env.NODE_ENV === 'production') {
-  app.use(express.static(path.join(__dirname, '../client/dist')));
-  app.use((_req, res) => {
-  res.sendFile(path.join(__dirname, '../client/dist/index.html'));
-});
-}
-
-
 // Socket.io セットアップ
 const io = new Server(httpServer, {
   cors: {
@@ -79,6 +71,14 @@ app.get('/health', async (_req, res) => {
 // Socket.io 接続イベント
 setupSocket(io);
 resumeActiveTimers(io).catch(console.error);
+
+//SPAフォールバック
+if (process.env.NODE_ENV === 'production') {
+  app.use(express.static(path.join(__dirname, '../client/dist')));
+  app.get('*', (_req, res) => {
+    res.sendFile(path.join(__dirname, '../client/dist/index.html'));
+  });
+}
 
 // サーバー起動
 const PORT = process.env.PORT || 3001;
