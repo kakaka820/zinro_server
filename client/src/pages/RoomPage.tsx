@@ -91,6 +91,7 @@ export default function RoomPage() {
   };
 
   const isOwner = user?.id === room?.owner_id;
+  const isLastMember = members.length === 1;
   const canStart = isOwner && members.length >= 1; //開発用　一人でもゲーム開始できるように（メモ）
 
   if (!room) return <div className="container">読み込み中...</div>;
@@ -101,7 +102,9 @@ export default function RoomPage() {
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center',
         borderBottom: '1px solid #4a4a7a', paddingBottom: 8, marginBottom: 16 }}>
         <h1 style={{ fontSize: 18 }}>🚪 {room.name}</h1>
-        <button onClick={leaveRoom} style={{ fontSize: 12 }}>退室</button>
+        <button onClick={leaveRoom} style={{ fontSize: 12 }}>
+          {isLastMember ? '村を閉じる' : '退室'}
+        </button>
       </div>
 
       {error && <p className="error" style={{ marginBottom: 12 }}>{error}</p>}
