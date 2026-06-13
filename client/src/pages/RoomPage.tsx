@@ -51,7 +51,7 @@ export default function RoomPage() {
     fetchRoom();
 
     socketRef.current = io(
-      import.meta.env.VITE_SOCKET_URL || 'http://localhost:3001',
+      import.meta.env.VITE_SOCKET_URL || window.location.origin,
       { withCredentials: true }
     );
 

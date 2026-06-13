@@ -94,7 +94,7 @@ export default function GamePage() {
     fetchMyRole();
 
     socketRef.current = io(
-      import.meta.env.VITE_SOCKET_URL || 'http://localhost:3001',
+      import.meta.env.VITE_SOCKET_URL || window.location.origin,
       { withCredentials: true }
     );
 
