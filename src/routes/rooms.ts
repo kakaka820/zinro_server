@@ -135,8 +135,8 @@ roomsRouter.post('/:id/join', requireAuth, async (req: Request, res: Response) =
       [roomId, userId]
     );
     if (alreadyIn.rows.length > 0) {
-      res.status(400).json({ error: 'すでに入室しています' });
-      return;
+       res.json({ message: 'すでに入室しています', roomId, asSpectator });
+    return;
     }
 
     await query(
