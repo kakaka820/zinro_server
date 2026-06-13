@@ -6,9 +6,9 @@ export const useSocket = () => {
 
   useEffect(() => {
     socketRef.current = io(
-  import.meta.env.VITE_SOCKET_URL || window.location.origin,
-  { withCredentials: true }
-);
+      import.meta.env.VITE_SOCKET_URL || window.location.origin,
+      { withCredentials: true }
+    );
     return () => { socketRef.current?.disconnect(); };
   }, []);
 
