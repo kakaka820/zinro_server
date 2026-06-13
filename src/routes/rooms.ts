@@ -171,7 +171,16 @@ router.post('/:id/leave', requireAuth, async (req: Request, res: Response) => {
     );
     const remainingCount = parseInt(remaining.rows[0].count);
 
+
+    //現行の仕様ではゲーム終了後村のログも削除されるので後々対応する（rooms削除時にgamesのroom_idをNULLにすることでゲームは残す）（メモ）
     if (remainingCount === 0) {
+      // ゲームが紐づいている場合は先に削除
+      const gameIds = await query('SELECT id FROM games WHERE room_id = $1', [roomId]);
+      for (const g of gameIds.rows) {
+        await query('DELETE FROM game_events WHERE game_id = $1', [g.id]);
+        await query('DELETE FROM game_players WHERE game_id = $1', [g.id]);
+      }
+      await query('DELETE FROM games WHERE room_id = $1', [roomId]);
       // 誰もいなくなった → 部屋ごと削除
       await query('DELETE FROM rooms WHERE id = $1', [roomId]);
       res.json({ message: '村を閉じました', roomClosed: true });
@@ -182,7 +191,10 @@ router.post('/:id/leave', requireAuth, async (req: Request, res: Response) => {
     const roomResult = await query('SELECT owner_id FROM rooms WHERE id = $1', [roomId]);
     if (roomResult.rows.length > 0 && roomResult.rows[0].owner_id === userId) {
       const newOwner = await query(
-        'SELECT user_id FROM room_members WHERE room_id = $1 LIMIT 1',
+        `SELECT rm.user_id FROM room_members rm
+        JOIN users u ON rm.user_id = u.id
+        WHERE rm.room_id = $1 AND u.is_bot = FALSE
+        LIMIT 1`,
         [roomId]
       );
       if (newOwner.rows.length > 0) {
