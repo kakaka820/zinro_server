@@ -36,9 +36,10 @@ router.get('/', async (_req, res: Response) => {
 router.get('/:id', async (req: Request, res: Response) => {
   try {
     const roomResult = await query(
-      `SELECT r.*, u.handle_name AS owner_name
+      `SELECT r.*, u.handle_name AS owner_name, g.id AS current_game_id
        FROM rooms r
        JOIN users u ON r.owner_id = u.id
+       LEFT JOIN games g ON g.room_id = r.id AND g.status = 'in_progress'
        WHERE r.id = $1`,
       [req.params.id]
     );

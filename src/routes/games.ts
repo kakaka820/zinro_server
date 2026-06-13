@@ -29,6 +29,11 @@ router.post('/start', requireAuth, async (req: Request, res: Response) => {
 
     const game = await startGame(roomId);
     schedulePhaseEnd(io, game.id, new Date(game.phase_ends_at));
+
+    // 部屋の全員にゲーム開始を通知
+    io.to(`room:${roomId}`).emit('game_started', { gameId: game.id });
+
+    
     res.json(game);
 
 
