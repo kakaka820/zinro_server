@@ -117,7 +117,6 @@ export default function LobbyPage() {
             </label>
           </div>
           <button type="submit">作成</button>
-                      <button type="submit">作成</button>
                     </form>
                   )}
                 </div>
