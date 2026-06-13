@@ -17,6 +17,7 @@ type Game = {
   current_phase: string;
   current_day: number;
   status: string;
+  winner_faction?: string;
   phase_ends_at: string | null;
   players: Player[];
 };
@@ -63,6 +64,10 @@ export default function GamePage() {
   const fetchGame = async () => {
     const res = await api.get<Game>(`/api/games/${id}`);
     setGame(res.data);
+    // リロード後もゲーム終了状態を復元
+    if (res.data.status === 'finished' && res.data.winner_faction) {
+    setWinner(res.data.winner_faction);
+  }
   };
 
   const fetchMyRole = async () => {
@@ -207,20 +212,35 @@ export default function GamePage() {
       </div>
 
       {error && <p className="error" style={{ marginBottom: 8 }}>{error}</p>}
-
-      {/* ─── ゲーム終了バナー ─── */}
-      {winner && (
-        <div style={{ background: '#2a1a4a', border: '1px solid #7a4aaa',
-          padding: 12, marginBottom: 12, textAlign: 'center' }}>
-          <p style={{ fontSize: 16, marginBottom: 8 }}>
-            {winner === 'villagers' ? '🏘️ 村人陣営の勝利！' : '🐺 人狼陣営の勝利！'}
-          </p>
-          <button onClick={() => navigate('/lobby')}>ロビーに戻る</button>
-          <button onClick={() => navigate(`/log/${id}`)} style={{ marginLeft: 8 }}>
-            ログを見る
+      
+      {/* 死亡者・観戦者は常にロビーへ戻れる */}
+      {(!isAlive || myRole === 'spectator') && phase !== 'game_over' && (
+        <div style={{ marginBottom: 8 }}>
+          <button
+            onClick={() => navigate('/lobby')}
+            style={{ fontSize: 12, color: '#aaa', borderColor: '#4a4a7a', background: 'transparent' }}
+          >
+            ロビーに戻る
           </button>
         </div>
       )}
+
+      {/* ─── ゲーム終了バナー ─── */}
+      
+      {(winner || phase === 'game_over') && (
+          <div style={{ background: '#2a1a4a', border: '1px solid #7a4aaa',
+            padding: 12, marginBottom: 12, textAlign: 'center' }}>
+            <p style={{ fontSize: 16, marginBottom: 8 }}>
+              {(winner ?? game?.winner_faction) === 'village'
+                ? '🏘️ 村人陣営の勝利！'
+                : '🐺 人狼陣営の勝利！'}
+            </p>
+            <button onClick={() => navigate('/lobby')}>ロビーに戻る</button>
+            <button onClick={() => navigate(`/log/${id}`)} style={{ marginLeft: 8 }}>
+              ログを見る
+            </button>
+          </div>
+        )}
 
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 220px', gap: 12 }}>
 
