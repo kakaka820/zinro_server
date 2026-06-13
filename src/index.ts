@@ -23,6 +23,8 @@ dotenv.config();
 const app = express();
 const httpServer = createServer(app);
 
+app.set('trust proxy', 1);
+
 
 // Socket.io セットアップ
 const io = new Server(httpServer, {
