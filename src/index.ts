@@ -10,7 +10,7 @@ import cors from 'cors';
 import dotenv from 'dotenv';
 import { pool } from './db';
 import { authRouter } from './routes/auth';
-import { roomsRouter } from './routes/rooms';
+import { createRoomsRouter } from './routes/rooms';
 import { setupSocket } from './socket/index';
 import { createGamesRouter } from './routes/games';
 import { betsRouter } from './routes/bets';
@@ -75,7 +75,7 @@ app.get('/health', async (_req, res) => {
    app.use('/api/auth', authRouter);
 
 //  ルームルート
-   app.use('/api/rooms', roomsRouter);
+   app.use('/api/rooms', createRoomsRouter(io));
    app.use('/api/games', createGamesRouter(io));
 
    app.use('/api/bets', betsRouter);
