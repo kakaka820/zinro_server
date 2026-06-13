@@ -19,6 +19,7 @@ type RoomDetail = {
   owner_id: number;
   status: string;
   max_players: number;
+  current_game_id?: number;
   members: Member[];
 };
 
@@ -41,6 +42,11 @@ export default function RoomPage() {
     const res = await api.get<RoomDetail>(`/api/rooms/${id}`);
     setRoom(res.data);
     setMembers(res.data.members);
+    // リロード時にすでにゲームが始まっていたら遷移
+    if (res.data.status === 'in_game' && res.data.current_game_id) {
+      navigate(`/game/${res.data.current_game_id}`);
+      return;
+    }
   } catch {
     setError('ルーム情報の取得に失敗しました');
   }
