@@ -9,6 +9,7 @@ type Member = {
   id: number;
   handle_name: string;
   is_ready?: boolean;
+  is_spectator?: boolean;
 };
 
 type RoomDetail = {
@@ -112,7 +113,9 @@ export default function RoomPage() {
       {/* 参加者一覧 */}
       <div style={{ marginBottom: 20 }}>
         <h2 style={{ fontSize: 14, color: '#aaa', marginBottom: 8 }}>
-          参加者　{members.length} / {room.max_players}人
+          参加者　{members.filter(m => !m.is_spectator).length} / {room.max_players}人
+          {members.filter(m => m.is_spectator).length > 0 &&
+            `　観戦 ${members.filter(m => m.is_spectator).length}人`}
         </h2>
         <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
           <tbody>
@@ -123,6 +126,9 @@ export default function RoomPage() {
                   {m.handle_name}
                   {m.id === room.owner_id && (
                     <span style={{ color: '#f4c430', fontSize: 11, marginLeft: 6 }}>★オーナー</span>
+                  )}
+                   {m.is_spectator && (
+                    <span style={{ color: '#888', fontSize: 11, marginLeft: 6 }}>👁 観戦</span>
                   )}
                   {m.id === user?.id && (
                     <span style={{ color: '#7ec8e3', fontSize: 11, marginLeft: 6 }}>(あなた)</span>

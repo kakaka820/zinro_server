@@ -49,10 +49,10 @@ export default function LobbyPage() {
     }
   };
 
-  const joinRoom = async (roomId: number) => {
-    try {
-      await api.post(`/api/rooms/${roomId}/join`);
-      navigate(`/room/${roomId}`);
+  const joinRoom = async (roomId: number, asSpectator = false) => {
+  try {
+    await api.post(`/api/rooms/${roomId}/join`, { asSpectator });
+    navigate(`/room/${roomId}`);
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : '入室に失敗しました');
     }
@@ -142,9 +142,15 @@ export default function LobbyPage() {
                   </td>
                   <td style={{ padding: '6px 8px', textAlign: 'right' }}>
                     {room.status === 'waiting' && (
-                      <button onClick={() => joinRoom(room.id)} style={{ fontSize: 12 }}>
-                        入室
-                      </button>
+                      <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end' }}>
+                        <button onClick={() => joinRoom(room.id)} style={{ fontSize: 12 }}>
+                          入室
+                        </button>
+                        <button onClick={() => joinRoom(room.id, true)}
+                          style={{ fontSize: 12, background: 'transparent', color: '#aaa', borderColor: '#555' }}>
+                          観戦
+                        </button>
+                      </div>
                     )}
                   </td>
                 </tr>
