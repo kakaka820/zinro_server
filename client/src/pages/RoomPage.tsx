@@ -85,12 +85,7 @@ export default function RoomPage() {
       navigate(`/game/${data.gameId}`);
     });
 
-    socketRef.current.on('kicked', ({ userId: kickedId }: { userId: number }) => {
-      if (kickedId === user?.id) {
-        alert('キックされました');
-        navigate('/lobby');
-      }
-    });
+    
 
 
     return () => {
@@ -103,6 +98,25 @@ export default function RoomPage() {
   if (!user?.id || !socketRef.current) return;
   socketRef.current.emit('join_room', { roomId: id, userId: user.id });
 }, [id, user?.id]);
+
+  // kicked リスナー（user.id が確定してから設定）
+useEffect(() => {
+  if (!user?.id || !socketRef.current) return;
+
+  const handleKicked = ({ userId: kickedId }: { userId: number }) => {
+    if (kickedId === user.id) {
+      alert('キックされました');
+      navigate('/lobby');
+    }
+  };
+
+  socketRef.current.on('kicked', handleKicked);
+
+  // クリーンアップ：リスナー重複防止
+  return () => {
+    socketRef.current?.off('kicked', handleKicked);
+  };
+}, [user?.id, id]);
 
   //自動スクロール
   useEffect(() => {
