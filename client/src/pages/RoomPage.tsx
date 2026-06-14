@@ -32,7 +32,8 @@ export default function RoomPage() {
   const { user } = useAuth();
   const navigate = useNavigate();
   const socketRef = useRef<Socket | null>(null);
-
+  const userIdRef = useRef<number | undefined>(undefined);
+  const skipLeaveRef = useRef(false);
   const [room, setRoom] = useState<RoomDetail | null>(null);
   const [members, setMembers] = useState<Member[]>([]);
   const [error, setError] = useState('');
@@ -42,6 +43,11 @@ export default function RoomPage() {
   const chatEndRef = useRef<HTMLDivElement>(null);
 
   const id = Number(roomId);
+
+  //userIdRefを常に最新のuser.idに保つ
+  useEffect(() => {
+    userIdRef.current = user?.id;
+  }, [user?.id]);
 
   // ─── ルーム情報取得 ───
   const fetchRoom = async () => {
@@ -82,6 +88,7 @@ export default function RoomPage() {
     });
 
     socketRef.current.on('game_started', (data: { gameId: number }) => {
+      skipLeaveRef.current = true;
       navigate(`/game/${data.gameId}`);
     });
 
@@ -89,9 +96,11 @@ export default function RoomPage() {
 
 
     return () => {
-      socketRef.current?.emit('leave_room', { roomId: id, userId: user?.id });
-      socketRef.current?.disconnect();
-    };
+        if (!skipLeaveRef.current && userIdRef.current) {
+          socketRef.current?.emit('leave_room', { roomId: id, userId: userIdRef.current });
+        }
+        socketRef.current?.disconnect();
+      };
   }, [id]);
 
   useEffect(() => {
@@ -105,6 +114,7 @@ useEffect(() => {
 
   const handleKicked = ({ userId: kickedId }: { userId: number }) => {
     if (kickedId === user.id) {
+      skipLeaveRef.current = true;
       alert('キックされました');
       navigate('/lobby');
     }
@@ -125,6 +135,8 @@ useEffect(() => {
 
   // ─── 退室 ───
   const leaveRoom = async () => {
+    skipLeaveRef.current = true;
+    socketRef.current?.emit('leave_room', { roomId: id, userId: userIdRef.current });
     await api.post(`/api/rooms/${id}/leave`);
     navigate('/lobby');
   };
