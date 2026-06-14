@@ -23,16 +23,18 @@ type Game = {
 };
 
 type ChatMessage = {
-  userId: number;
-  handleName: string;
+  type?: 'chat' | 'system';
+  userId?: number;
+  handleName?: string;
   message: string;
-  isWolfChat: boolean;
-  phase: string;
+  isWolfChat?: boolean;
+  phase?: string;
 };
 
 const PHASE_LABEL: Record<string, string> = {
   day_discussion: '☀️ 昼：議論',
   day_vote:       '☀️ 昼：投票',
+  execution:     '⚔️ 処刑',
   night:          '🌙 夜',
   game_over:      '🏁 ゲーム終了',
 };
@@ -113,9 +115,13 @@ export default function GamePage() {
       isWolf: false, // サーバー側で判断するのが本来だが今は簡易実装
     });
 
-    socketRef.current.on('chat_message', (msg: ChatMessage) => {
-      setMessages(prev => [...prev, msg]);
-    });
+    socketRef.current.on('system_message', ({ message }: { message: string }) => {
+  setMessages(prev => [...prev, { type: 'system', message }]);
+});
+    
+socketRef.current.on('chat_message', (msg: ChatMessage) => {
+  setMessages(prev => [...prev, msg]);
+});
 
     socketRef.current.on('phase_change', () => {
       fetchGame();
@@ -136,6 +142,8 @@ export default function GamePage() {
 
     return () => { socketRef.current?.disconnect(); };
   }, [id]);
+
+  
 
   // チャット末尾に自動スクロール
   useEffect(() => {
@@ -271,11 +279,21 @@ export default function GamePage() {
             )}
             {messages.map((m, i) => (
               <div key={i} style={{ marginBottom: 4 }}>
-                {m.isWolfChat && (
-                  <span style={{ color: '#aa4a4a', fontSize: 11 }}>[🐺] </span>
-                )}
-                <span style={{ color: '#7ec8e3' }}>{m.handleName}：</span>
-                <span>{m.message}</span>
+                {m.type === 'system' ? (
+              // システムメッセージ：グレーで中央寄せ
+              <span style={{ color: '#666', fontSize: 11, display: 'block', textAlign: 'center' }}>
+                {m.message}
+              </span>
+            ) : (
+              //通常チャット
+              <>
+                        {m.isWolfChat && (
+                          <span style={{ color: '#aa4a4a', fontSize: 11 }}>[🐺] </span>
+                        )}
+                        <span style={{ color: '#7ec8e3' }}>{m.handleName}：</span>
+                        <span>{m.message}</span>
+                        </>
+              )}
               </div>
             ))}
             <div ref={chatEndRef} />
