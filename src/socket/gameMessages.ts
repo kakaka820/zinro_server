@@ -31,3 +31,13 @@ export const msgNoDeathAtNight = (io: Server, gameId: number) =>
 
 export const msgExecution = (io: Server, gameId: number, playerName: string) =>
   toGame(io, gameId, `⚔️ 「${playerName}」が処刑されました`);
+
+
+// 投票結果サマリー（行の配列を受け取って1メッセージにまとめる）
+export const msgVoteSummary = (
+  io: Server,
+  gameId: number,
+  lines: string[]
+) => {
+  toGame(io, gameId, `【投票結果】\n${lines.join('\n')}`);
+};
