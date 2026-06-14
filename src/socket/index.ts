@@ -4,6 +4,7 @@ import { Server, Socket } from 'socket.io';
 import { query } from '../db';
 import { logEvent } from '../game/engine';
 import { broadcastSystemMessage } from './systemMessages';
+import { msgPhaseChange, msgGameEnd } from './gameMessages';
 import { setupRoomChat } from './roomChat';
 
 export const setupSocket = (io: Server) => {
@@ -111,18 +112,12 @@ export const broadcastPhaseChange = (
   phase: string, day: number, phaseEndsAt: Date
 ) => {
   io.to(`game:${gameId}`).emit('phase_change', { phase, day, phaseEndsAt });
-  const PHASE_LABELS: Record<string, string> = {
-  day_discussion: '昼：議論', day_vote: '昼：投票', execution: '処刑', night: '夜',
-};
-//開始前は？（メモ）
-broadcastSystemMessage(io, `game:${gameId}`, `── ${PHASE_LABELS[phase] ?? phase}　${day}日目 ──`);
-
+  msgPhaseChange(io, gameId, phase, day);
 };
 
 export const broadcastGameEnd = (io: Server, gameId: number, winner: string) => {
   io.to(`game:${gameId}`).emit('game_end', { winner });
-  const msg = winner === 'village' ? '村人陣営の勝利です！' : '人狼陣営の勝利です！';
-broadcastSystemMessage(io, `game:${gameId}`, `── ${msg} ──`);
+  msgGameEnd(io, gameId, winner);
 };
 
 export const broadcastPlayerDeath = (io: Server, gameId: number, userId: number) => {
