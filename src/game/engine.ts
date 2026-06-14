@@ -154,12 +154,8 @@ export const advancePhase = async (gameId: number) => {
       durationSec = 60; // 投票フェーズは60秒
       break;
     case 'day_vote':
-      nextPhase = 'execution';
-      durationSec = 10;
-      break;
-    case 'execution':
       nextPhase = 'night';
-      durationSec = 180; // 夜180秒
+      durationSec = 180;
       break;
     case 'night':
       nextPhase = 'day_discussion';

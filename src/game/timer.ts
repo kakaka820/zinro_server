@@ -309,7 +309,7 @@ if (topCandidates.length === 1) {
      WHERE game_id = $2 AND user_id = $3`,
     [currentDay, gameId, targetId]
   );
-  await logEvent(gameId, 'execution', 'execution', null, targetId, { day: currentDay });
+  await logEvent(gameId, 'day_vote', 'execution', null, targetId, { day: currentDay });
   broadcastPlayerDeath(io, gameId, targetId);
 
   const info = await query(
