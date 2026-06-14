@@ -175,11 +175,8 @@ router.post('/:id/advance', requireAuth, async (req: Request, res: Response) => 
   try {
     // 夜→昼の切替時は夜アクション処理を先にやる
     const gameResult = await query('SELECT current_phase FROM games WHERE id = $1', [gameId]);
-    //if (gameResult.rows[0].current_phase === 'night') {
-    //  await resolveNight(gameId);
-    // }
-    //↑194-196行目までのこの行を↓これにおきかえてもいいかもしれんが、そもそも死者イベントが既に機能している気がしていて困惑中（メモ）
-    /*if (gameResult.rows[0].current_phase === 'night') {
+  
+    if (gameResult.rows[0].current_phase === 'night') {
   const { killTarget } = await resolveNight(gameId);
   if (killTarget) {
     const nameResult = await query('SELECT handle_name FROM users WHERE id = $1', [killTarget]);
@@ -190,11 +187,6 @@ router.post('/:id/advance', requireAuth, async (req: Request, res: Response) => 
     msgNoDeathAtNight(io, gameId);
   }
 }
-  */
-    if (gameResult.rows[0].current_phase === 'night') {
-      await resolveNight(gameId);
-    }
-
     const winner = await checkWinCondition(gameId);
     if (winner) {
       await query(
