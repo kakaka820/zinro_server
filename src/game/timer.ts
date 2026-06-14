@@ -4,11 +4,12 @@
 import { Server } from 'socket.io';
 import { query } from '../db';
 import {
-  advancePhase, resolveNight, checkWinCondition, logEvent
+  advancePhase, resolveNight, checkWinCondition, logEvent, ROLES
 } from './engine';
 import {
   broadcastPhaseChange, broadcastGameEnd, broadcastPlayerDeath
 } from '../socket/index';
+import { broadcastSystemMessage } from '../socket/systemMessages';
 
 const activeTimers = new Map<number, NodeJS.Timeout>();
 
@@ -51,7 +52,21 @@ const handlePhaseEnd = async (io: Server, gameId: number) => {
     if (game.current_phase === 'night') {
       await handleMissingNightActions(io, gameId, game.current_day);
       const { killTarget } = await resolveNight(gameId);
-      if (killTarget) broadcastPlayerDeath(io, gameId, killTarget);
+      if (killTarget) {
+  broadcastPlayerDeath(io, gameId, killTarget);
+  const info = await query(
+    `SELECT u.handle_name, gp.role FROM game_players gp
+     JOIN users u ON gp.user_id = u.id
+     WHERE gp.game_id = $1 AND gp.user_id = $2`,
+    [gameId, killTarget]
+  );
+  if (info.rows[0]) {
+    const roleLabel = ROLES[info.rows[0].role as keyof typeof ROLES]?.label ?? info.rows[0].role;
+    broadcastSystemMessage(io, `game:${gameId}`,
+      `「${info.rows[0].handle_name}」（${roleLabel}）が夜の間に亡くなりました`);
+      // 突然死と占われて死んだのを区別したい（メモ）
+  }
+}
     }
 
     // 勝利条件チェック
@@ -80,7 +95,8 @@ const handlePhaseEnd = async (io: Server, gameId: number) => {
 
     // Bot が即座に行動
     await performBotActions(gameId, result.nextPhase, result.nextDay);
-    schedulePhaseEnd(io, result.phaseEndsAt ? gameId : gameId, result.phaseEndsAt);
+    //schedulePhaseEndが2回呼ばれてるというのでこの行を削除しましたが動作確認してください（メモ）
+    //schedulePhaseEnd(io, result.phaseEndsAt ? gameId : gameId, result.phaseEndsAt);
 
   } catch (e) {
     console.error(`[timer] game ${gameId} エラー:`, e);
@@ -225,6 +241,19 @@ const executeVote = async (io: Server, gameId: number, currentDay: number) => {
   );
   await logEvent(gameId, 'execution', 'execution', null, targetId, { day: currentDay });
   broadcastPlayerDeath(io, gameId, targetId);
+  const info = await query(
+  `SELECT u.handle_name, gp.role FROM game_players gp
+   JOIN users u ON gp.user_id = u.id
+   WHERE gp.game_id = $1 AND gp.user_id = $2`,
+  [gameId, targetId]
+);
+if (info.rows[0]) {
+  const roleLabel = ROLES[info.rows[0].role as keyof typeof ROLES]?.label ?? info.rows[0].role;
+  broadcastSystemMessage(io, `game:${gameId}`,
+    `「${info.rows[0].handle_name}」が処刑されました`);
+    //↓これは「名前」（役職名）を表示するシステムメッセージ（メモ）
+    //`「${info.rows[0].handle_name}」（${roleLabel}）が処刑されました`);
+}
 };
 
 // サーバー再起動時に進行中ゲームのタイマーを復元
