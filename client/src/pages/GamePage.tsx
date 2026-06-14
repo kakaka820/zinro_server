@@ -79,7 +79,7 @@ export default function GamePage() {
       const res = await api.get<{ role: string }>(`/api/games/${id}/my-role`);
       setMyRole(res.data.role);
     } catch {
-      setMyRole('spectator');
+      setMyRole('null');
     }
   };
 
