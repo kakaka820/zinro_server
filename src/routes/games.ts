@@ -10,6 +10,7 @@ import {
 } from '../game/engine';
 import { Server } from 'socket.io';
 import { broadcastPhaseChange, broadcastGameEnd, broadcastPlayerDeath } from '../socket/index';
+import { msgGameStart, msgNightDeath, msgNoDeathAtNight } from '../socket/gameMessages';
 import { schedulePhaseEnd, cancelTimer } from '../game/timer';
 
 
@@ -32,6 +33,7 @@ router.post('/start', requireAuth, async (req: Request, res: Response) => {
 
     // 部屋の全員にゲーム開始を通知
     io.to(`room:${roomId}`).emit('game_started', { gameId: game.id });
+    msgGameStart(io, game.id);
 
     
     res.json(game);
@@ -173,6 +175,22 @@ router.post('/:id/advance', requireAuth, async (req: Request, res: Response) => 
   try {
     // 夜→昼の切替時は夜アクション処理を先にやる
     const gameResult = await query('SELECT current_phase FROM games WHERE id = $1', [gameId]);
+    //if (gameResult.rows[0].current_phase === 'night') {
+    //  await resolveNight(gameId);
+    // }
+    //↑194-196行目までのこの行を↓これにおきかえてもいいかもしれんが、そもそも死者イベントが既に機能している気がしていて困惑中（メモ）
+    /*if (gameResult.rows[0].current_phase === 'night') {
+  const { killTarget } = await resolveNight(gameId);
+  if (killTarget) {
+    const nameResult = await query('SELECT handle_name FROM users WHERE id = $1', [killTarget]);
+    const playerName = nameResult.rows[0]?.handle_name ?? '不明';
+    broadcastPlayerDeath(io, gameId, killTarget);   // 死者イベント（今まで未実装だったバグ修正）
+    msgNightDeath(io, gameId, playerName);
+  } else {
+    msgNoDeathAtNight(io, gameId);
+  }
+}
+  */
     if (gameResult.rows[0].current_phase === 'night') {
       await resolveNight(gameId);
     }
