@@ -103,6 +103,7 @@ export default function RoomPage() {
       };
   }, [id]);
 
+  //join_room（再接続対応）
   useEffect(() => {
   if (!user?.id || !socketRef.current) return;
   const handleConnect = () => {
@@ -111,9 +112,6 @@ export default function RoomPage() {
   socketRef.current.on('connect', handleConnect);
 
   // kicked リスナー（user.id が確定してから設定）
-useEffect(() => {
-  if (!user?.id || !socketRef.current) return;
-  // 既に接続済みなら今すぐemit
   if (socketRef.current.connected) {
     socketRef.current.emit('join_room', { roomId: id, userId: user.id });
   }
@@ -122,6 +120,9 @@ useEffect(() => {
   };
 }, [id, user?.id]);
 
+// Kickedリスナー
+useEffect(() => {
+    if (!user?.id || !socketRef.current) return;
   const handleKicked = ({ userId: kickedId }: { userId: number }) => {
     if (kickedId === user.id) {
       skipLeaveRef.current = true;
