@@ -39,5 +39,8 @@ export const msgVoteSummary = (
   gameId: number,
   lines: string[]
 ) => {
-  toGame(io, gameId, `【投票結果】\n${lines.join('\n')}`);
+  toGame(io, gameId, '【投票結果】');
+  for (const line of lines) {
+    toGame(io, gameId, line);
+  }
 };
