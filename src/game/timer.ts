@@ -10,6 +10,7 @@ import {
   broadcastPhaseChange, broadcastGameEnd, broadcastPlayerDeath
 } from '../socket/index';
 import { broadcastSystemMessage } from '../socket/systemMessages';
+import { msgVoteSummary } from '../socket/gameMessages';
 
 const activeTimers = new Map<number, NodeJS.Timeout>();
 
@@ -221,22 +222,79 @@ const handleMissingNightActions = async (io: Server, gameId: number, currentDay:
 
 // 投票集計 → 最多得票者を処刑
 const executeVote = async (io: Server, gameId: number, currentDay: number) => {
-  const voteResult = await query(
-    `SELECT target_id, COUNT(*) AS cnt
-     FROM game_events
-     WHERE game_id = $1
-       AND phase = 'day_vote'
-       AND event_type = 'vote'
-       AND (data->>'day')::int = $2
-     GROUP BY target_id
-     ORDER BY cnt DESC
-     LIMIT 1`,
+  // 投票者・投票先・その投票者が受けた票数を一度に取得
+  const allVotesResult = await query(
+    `SELECT
+       u_voter.handle_name  AS voter_name,
+       u_target.handle_name AS voted_for_name,
+       ge.target_id,
+       COALESCE(received.cnt, 0) AS votes_received,
+       (ge.data->>'isAutoVote')::boolean AS is_auto
+     FROM game_events ge
+     JOIN users u_voter  ON ge.actor_id  = u_voter.id
+     JOIN users u_target ON ge.target_id = u_target.id
+     LEFT JOIN (
+       SELECT target_id, COUNT(*) AS cnt
+       FROM game_events
+       WHERE game_id = $1
+         AND phase = 'day_vote'
+         AND event_type = 'vote'
+         AND (data->>'day')::int = $2
+       GROUP BY target_id
+     ) received ON received.target_id = ge.actor_id
+     WHERE ge.game_id = $1
+       AND ge.phase = 'day_vote'
+       AND ge.event_type = 'vote'
+       AND (ge.data->>'day')::int = $2
+     ORDER BY ge.created_at ASC`,
     [gameId, currentDay]
   );
 
-  if (voteResult.rows.length === 0) return; // 誰も投票しなかった
+  if (allVotesResult.rows.length === 0) return;
 
-  const targetId = voteResult.rows[0].target_id;
+  const lines = allVotesResult.rows.map((r: {
+    voter_name: string;
+    voted_for_name: string;
+    votes_received: number;
+    is_auto: boolean;
+  }) => {
+    const name = r.is_auto ? `${r.voter_name}（自動）` : r.voter_name;
+    return `${name}（${r.votes_received}票）→${r.voted_for_name}`;
+  });
+
+  msgVoteSummary(io, gameId, lines);
+
+  // 最多得票者を処刑（同票の場合は先に投票された方を優先）
+  // 全員の得票数を取得
+const tallyResult = await query(
+  `SELECT target_id, COUNT(*) AS cnt
+   FROM game_events
+   WHERE game_id = $1
+     AND phase = 'day_vote'
+     AND event_type = 'vote'
+     AND (data->>'day')::int = $2
+   GROUP BY target_id
+   ORDER BY cnt DESC`,
+  [gameId, currentDay]
+);
+
+// 最多票数と同票の候補を全員リストアップ
+const maxCnt = Number(tallyResult.rows[0].cnt);
+const topCandidates = tallyResult.rows.filter(
+  (r: { target_id: number; cnt: string }) => Number(r.cnt) === maxCnt
+);
+
+// 同票ならランダム、そうでなければ確定
+let targetId: number;
+if (topCandidates.length === 1) {
+  targetId = topCandidates[0].target_id;
+} else {
+  const chosen = topCandidates[Math.floor(Math.random() * topCandidates.length)];
+  targetId = chosen.target_id;
+  broadcastSystemMessage(io, `game:${gameId}`, '⚖️ 同票のためランダムで処刑先を決定します。');
+}
+
+
   await query(
     `UPDATE game_players SET is_alive = FALSE, died_at_day = $1
      WHERE game_id = $2 AND user_id = $3`,
@@ -244,19 +302,20 @@ const executeVote = async (io: Server, gameId: number, currentDay: number) => {
   );
   await logEvent(gameId, 'execution', 'execution', null, targetId, { day: currentDay });
   broadcastPlayerDeath(io, gameId, targetId);
+
   const info = await query(
-  `SELECT u.handle_name, gp.role FROM game_players gp
-   JOIN users u ON gp.user_id = u.id
-   WHERE gp.game_id = $1 AND gp.user_id = $2`,
-  [gameId, targetId]
-);
-if (info.rows[0]) {
-  const roleLabel = ROLES[info.rows[0].role as keyof typeof ROLES]?.label ?? info.rows[0].role;
-  broadcastSystemMessage(io, `game:${gameId}`,
-    `「${info.rows[0].handle_name}」が処刑されました`);
-    //↓これは「名前」（役職名）を表示するシステムメッセージ（メモ）
-    //`「${info.rows[0].handle_name}」（${roleLabel}）が処刑されました`);
-}
+    `SELECT u.handle_name, gp.role FROM game_players gp
+     JOIN users u ON gp.user_id = u.id
+     WHERE gp.game_id = $1 AND gp.user_id = $2`,
+    [gameId, targetId]
+  );
+  if (info.rows[0]) {
+    const roleLabel = ROLES[info.rows[0].role as keyof typeof ROLES]?.label ?? info.rows[0].role;
+    broadcastSystemMessage(io, `game:${gameId}`,
+      `⚔️ 「${info.rows[0].handle_name}」が処刑されました`);
+      //↓これは「名前」（役職名）を表示するシステムメッセージ（メモ）
+    //`⚔️ 「${info.rows[0].handle_name}」（${roleLabel}）が処刑されました`);
+  }
 };
 
 // サーバー再起動時に進行中ゲームのタイマーを復元
