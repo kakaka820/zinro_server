@@ -109,12 +109,6 @@ export default function GamePage() {
       { withCredentials: true }
     );
 
-    socketRef.current.emit('join_game', {
-      gameId: id,
-      userId: user?.id,
-      isWolf: false, // サーバー側で判断するのが本来だが今は簡易実装
-    });
-
     socketRef.current.on('system_message', ({ message }: { message: string }) => {
   setMessages(prev => [...prev, { type: 'system', message }]);
 });
@@ -143,7 +137,14 @@ socketRef.current.on('chat_message', (msg: ChatMessage) => {
     return () => { socketRef.current?.disconnect(); };
   }, [id]);
 
-  
+  useEffect(() => {
+  if (!user?.id || !socketRef.current) return;
+  socketRef.current.emit('join_game', {
+    gameId: id,
+    userId: user.id,
+    isWolf: false,
+  });
+}, [id, user?.id]);
 
   // チャット末尾に自動スクロール
   useEffect(() => {

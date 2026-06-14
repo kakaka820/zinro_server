@@ -69,8 +69,6 @@ export default function RoomPage() {
       { withCredentials: true }
     );
 
-    socketRef.current.emit('join_room', { roomId: id, userId: user?.id });
-
     socketRef.current.on('system_message', ({ message }: { message: string }) => {
     setMessages(prev => [...prev, { type: 'system', message }]);
   });
@@ -100,6 +98,11 @@ export default function RoomPage() {
       socketRef.current?.disconnect();
     };
   }, [id]);
+
+  useEffect(() => {
+  if (!user?.id || !socketRef.current) return;
+  socketRef.current.emit('join_room', { roomId: id, userId: user.id });
+}, [id, user?.id]);
 
   //自動スクロール
   useEffect(() => {
