@@ -165,7 +165,8 @@ const performBotNightActions = async (gameId: number, currentDay: number) => {
 // 未投票プレイヤーをランダム投票（Bot・人間両方）
 const fillMissingVotes = async (io: Server, gameId: number, currentDay: number) => {
   const notVotedResult = await query(
-    `SELECT gp.user_id FROM game_players gp
+    `SELECT gp.user_id, u.handle_name FROM game_players gp
+     JOIN users u ON gp.user_id = u.id
      WHERE gp.game_id = $1 AND gp.is_alive = TRUE
      AND gp.user_id NOT IN (
        SELECT actor_id FROM game_events
@@ -237,6 +238,8 @@ const executeVote = async (io: Server, gameId: number, currentDay: number) => {
        COALESCE(received.cnt, 0) AS votes_received,
        (ge.data->>'isAutoVote')::boolean AS is_auto
      FROM game_events ge
+     JOIN game_players gp_voter
+    ON gp_voter.game_id = ge.game_id AND gp_voter.user_id = ge.actor_id
      JOIN users u_voter  ON ge.actor_id  = u_voter.id
      JOIN users u_target ON ge.target_id = u_target.id
      LEFT JOIN (
@@ -252,7 +255,7 @@ const executeVote = async (io: Server, gameId: number, currentDay: number) => {
        AND ge.phase = 'day_vote'
        AND ge.event_type = 'vote'
        AND (ge.data->>'day')::int = $2
-     ORDER BY ge.created_at ASC`,
+    ORDER BY gp_voter.id ASC`,
     [gameId, currentDay]
   );
 
