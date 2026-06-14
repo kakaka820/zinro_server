@@ -63,8 +63,11 @@ const handlePhaseEnd = async (io: Server, gameId: number) => {
   if (info.rows[0]) {
     const roleLabel = ROLES[info.rows[0].role as keyof typeof ROLES]?.label ?? info.rows[0].role;
     broadcastSystemMessage(io, `game:${gameId}`,
-      `「${info.rows[0].handle_name}」（${roleLabel}）が夜の間に亡くなりました`);
+      `「${info.rows[0].handle_name}」が夜の間に亡くなりました`);
+      
       // 突然死と占われて死んだのを区別したい（メモ）
+      // 役職名を表示する場合はこう
+      //`「${info.rows[0].handle_name}」（${roleLabel}）が夜の間に亡くなりました`);
   }
 }
     }
