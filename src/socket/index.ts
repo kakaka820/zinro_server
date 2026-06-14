@@ -7,6 +7,54 @@ import { broadcastSystemMessage } from './systemMessages';
 import { msgPhaseChange, msgGameEnd } from './gameMessages';
 import { setupRoomChat } from './roomChat';
 
+// ─── 役職チャンネル設定（拡張ポイント）───
+// 夜フェーズ中に参加するチャンネルと送信可否を定義
+// 新役職追加時はここにエントリを追加するだけでOK
+type RoleChannelConfig = {
+  channel: string;   // チャンネル名（例: 'wolves', 'sharing'）
+  canSend: boolean;  // このチャンネルへの送信可否
+};
+
+const NIGHT_ROLE_CHANNELS: Record<string, RoleChannelConfig[]> = {
+  werewolf: [{ channel: 'wolves', canSend: true }],
+  madman:   [],  // 標準狂人：狼チャット不可
+  seer:     [],
+  medium:   [],
+  knight:   [],
+  villager: [],
+  // 将来の拡張例（コメントアウトのまま残す）:
+  // sharing_villager: [{ channel: 'sharing', canSend: true }],
+  // listening_madman: [{ channel: 'wolves', canSend: false }], // 聴狂人：受信のみ
+};
+
+// ─── フェーズ×役職でチャットルーティングを決定 ───
+type ChatRouting =
+  | { type: 'public' }                            // game:${id} 全員
+  | { type: 'role_channel'; channel: string }     // 役職チャンネル（夜のみ）
+  | { type: 'self_only' };                        // 送信者のソケットのみ
+
+  function getChatRouting(phase: string, role: string): ChatRouting {
+  switch (phase) {
+    case 'day_discussion':
+    case 'game_over':
+      return { type: 'public' };
+    case 'day_vote':
+    case 'execution':
+      return { type: 'self_only' };
+    case 'night': {
+      const roleChannels = NIGHT_ROLE_CHANNELS[role] ?? [];
+      const sendableChannel = roleChannels.find(c => c.canSend);
+      if (sendableChannel) {
+        return { type: 'role_channel', channel: sendableChannel.channel };
+      }
+      return { type: 'self_only' };
+    }
+
+    default:
+      return { type: 'self_only' };
+  }
+}
+
 export const setupSocket = (io: Server) => {
 
   io.on('connection', (socket: Socket) => {
@@ -45,20 +93,32 @@ export const setupSocket = (io: Server) => {
 });
 
     // ─── ゲームルームに参加（ゲーム開始後）───
-    socket.on('join_game', async ({
-      gameId, userId, isWolf
-    }: { gameId: number; userId: number; isWolf: boolean }) => {
-      // 全員参加するチャンネル
+    socket.on('join_game', async ({ gameId, userId }: { gameId: number; userId: number }) => {
       socket.join(`game:${gameId}`);
-      // 人狼専用チャンネル
-      if (isWolf) socket.join(`game:${gameId}:wolves`);
+      const result = await query(
+        `SELECT role FROM game_players WHERE game_id = $1 AND user_id = $2`,
+        [gameId, userId]
+      );
+      const role: string = result.rows[0]?.role ?? 'villager';
+      const roleChannels = NIGHT_ROLE_CHANNELS[role] ?? [];
+
+      // 役職に応じたチャンネルに参加（受信のみの役職も含む）
+      for (const { channel } of roleChannels) {
+        socket.join(`game:${gameId}:${channel}`);
+      }
+
+      // クライアントに参加チャンネル情報を通知
+      socket.emit('joined_game', {
+        role,
+        channels: roleChannels.map(c => ({ channel: c.channel, canSend: c.canSend })),
+      });
     });
 
     // ─── チャット送信 ───
     socket.on('chat', async ({
-      gameId, userId, message, isWolfChat
-    }: { gameId: number; userId: number; message: string; isWolfChat: boolean }) => {
-      // ゲームと送信者の確認
+      gameId, userId, message,
+    }: { gameId: number; userId: number; message: string }) => {
+      if (!message?.trim() || message.length > 200) return;
       const playerResult = await query(
         `SELECT gp.role, gp.is_alive, u.handle_name
          FROM game_players gp
@@ -69,52 +129,53 @@ export const setupSocket = (io: Server) => {
       if (playerResult.rows.length === 0) return;
 
       const { role, is_alive, handle_name } = playerResult.rows[0];
-
-      // 死亡者は発言不可（観戦チャットは別途実装）
       if (!is_alive) return;
 
-      // 狼チャットは人狼・狂人のみ送れる
-      if (isWolfChat && role !== 'werewolf') return;
+      const gameResult = await query('SELECT current_phase FROM games WHERE id = $1', [gameId]);
+      const phase: string = gameResult.rows[0]?.current_phase;
+      const routing = getChatRouting(phase, role);
+      const isRoleChat = routing.type === 'role_channel';
+      const channel = isRoleChat ? (routing as { type: 'role_channel'; channel: string }).channel : null;
 
-      const gameResult = await query(
-        'SELECT current_phase FROM games WHERE id = $1', [gameId]
-      );
-      const phase = gameResult.rows[0]?.current_phase;
 
       // イベントログに保存
       await logEvent(gameId, phase, 'chat', userId, null,
-        { message, handleName: handle_name }, isWolfChat);
-
-      // 配信先を決める
-      const channel = isWolfChat ? `game:${gameId}:wolves` : `game:${gameId}`;
-      io.to(channel).emit('chat_message', {
+        { message, handleName: handle_name, channel },
+        isRoleChat
+      );
+      const payload = {
         userId,
         handleName: handle_name,
         message,
-        isWolfChat,
         phase,
-      });
+        channel,  // 'wolves' | 'sharing' | null(=公開)
+        isWolfChat: channel === 'wolves',  // 後方互換性のため残す
+      };
+
+      switch (routing.type) {
+        case 'public':
+          io.to(`game:${gameId}`).emit('chat_message', payload);
+          break;
+        case 'role_channel':
+          io.to(`game:${gameId}:${routing.channel}`).emit('chat_message', payload);
+          break;
+        case 'self_only':
+          socket.emit('chat_message', payload);
+          break;
+      }
     });
 
-    // ─── 切断 ───
-    socket.on('disconnect', () => {
-      console.log(`切断: ${socket.id}`);
-    });
+    socket.on('disconnect', () => { /* ログはpino等で */ });
   });
-
 };
 
 // ─── ゲームエンジンからSocket.ioを使うためのヘルパー ───
-// ゲームエンジン（routes/games.ts）からこれを呼ぶ
-
 export const broadcastPhaseChange = (
-  io: Server, gameId: number,
-  phase: string, day: number, phaseEndsAt: Date
+  io: Server, gameId: number, phase: string, day: number, phaseEndsAt: Date
 ) => {
   io.to(`game:${gameId}`).emit('phase_change', { phase, day, phaseEndsAt });
   msgPhaseChange(io, gameId, phase, day);
 };
-
 export const broadcastGameEnd = (io: Server, gameId: number, winner: string) => {
   io.to(`game:${gameId}`).emit('game_end', { winner });
   msgGameEnd(io, gameId, winner);
