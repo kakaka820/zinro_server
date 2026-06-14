@@ -40,7 +40,6 @@ const EVENT_LABEL: Record<string, string> = {
 const PHASE_LABEL: Record<string, string> = {
   day_discussion: '昼・議論',
   day_vote:       '昼・投票',
-  execution:      '処刑',
   night:          '夜',
   game_over:      '終了',
 };
