@@ -39,7 +39,6 @@ type ChatRouting =
     case 'game_over':
       return { type: 'public' };
     case 'day_vote':
-    case 'execution':
       return { type: 'self_only' };
     case 'night': {
       const roleChannels = NIGHT_ROLE_CHANNELS[role] ?? [];

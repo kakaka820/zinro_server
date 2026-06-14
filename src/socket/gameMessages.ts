@@ -8,7 +8,6 @@ const toGame = (io: Server, gameId: number, message: string) =>
 const PHASE_LABELS: Record<string, string> = {
   day_discussion: '昼：議論',
   day_vote:       '昼：投票',
-  execution:      '処刑',
   night:          '夜',
 };
 
