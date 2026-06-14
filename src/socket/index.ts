@@ -3,10 +3,13 @@
 import { Server, Socket } from 'socket.io';
 import { query } from '../db';
 import { logEvent } from '../game/engine';
+import { broadcastSystemMessage } from './systemMessages';
+import { setupRoomChat } from './roomChat';
 
 export const setupSocket = (io: Server) => {
 
   io.on('connection', (socket: Socket) => {
+    setupRoomChat(io, socket);
     console.log(`接続: ${socket.id}`);
 
     // ─── ルームに参加（待機室・観戦含む）───
@@ -16,21 +19,29 @@ export const setupSocket = (io: Server) => {
       const userResult = await query(
         'SELECT handle_name FROM users WHERE id = $1', [userId]
       );
+      const handleName = userResult.rows[0]?.handle_name ?? '不明';
       io.to(`room:${roomId}`).emit('room_updated', {
         type: 'user_joined',
         handleName: userResult.rows[0]?.handle_name,
         userId,
       });
+      broadcastSystemMessage(io, `room:${roomId}`, `${handleName}が入室しました`);
     });
 
     // ─── ルームから退出 ───
-    socket.on('leave_room', ({ roomId, userId }: { roomId: number; userId: number }) => {
-      socket.leave(`room:${roomId}`);
-      io.to(`room:${roomId}`).emit('room_updated', {
-        type: 'user_left',
-        userId,
-      });
-    });
+    socket.on('leave_room', async ({ roomId, userId }: { roomId: number; userId: number }) => {
+  // async追加 + DB取得追加
+  const userResult = await query(
+    'SELECT handle_name FROM users WHERE id = $1', [userId]
+  );
+  const handleName = userResult.rows[0]?.handle_name ?? '不明';
+  socket.leave(`room:${roomId}`);
+  io.to(`room:${roomId}`).emit('room_updated', {
+    type: 'user_left',
+    userId,
+  });
+  broadcastSystemMessage(io, `room:${roomId}`, `「${handleName}」が退室しました`);
+});
 
     // ─── ゲームルームに参加（ゲーム開始後）───
     socket.on('join_game', async ({
@@ -100,10 +111,18 @@ export const broadcastPhaseChange = (
   phase: string, day: number, phaseEndsAt: Date
 ) => {
   io.to(`game:${gameId}`).emit('phase_change', { phase, day, phaseEndsAt });
+  const PHASE_LABELS: Record<string, string> = {
+  day_discussion: '昼：議論', day_vote: '昼：投票', execution: '処刑', night: '夜',
+};
+//開始前は？（メモ）
+broadcastSystemMessage(io, `game:${gameId}`, `── ${PHASE_LABELS[phase] ?? phase}　${day}日目 ──`);
+
 };
 
 export const broadcastGameEnd = (io: Server, gameId: number, winner: string) => {
   io.to(`game:${gameId}`).emit('game_end', { winner });
+  const msg = winner === 'village' ? '村人陣営の勝利です！' : '人狼陣営の勝利です！';
+broadcastSystemMessage(io, `game:${gameId}`, `── ${msg} ──`);
 };
 
 export const broadcastPlayerDeath = (io: Server, gameId: number, userId: number) => {
