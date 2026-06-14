@@ -45,7 +45,7 @@ const handlePhaseEnd = async (io: Server, gameId: number) => {
 
     // 投票集計・処刑（day_vote フェーズ終了時）
     if (game.current_phase === 'day_vote') {
-      await fillMissingVotes(gameId, game.current_day);
+      await fillMissingVotes(io, gameId, game.current_day);
       await executeVote(io, gameId, game.current_day);
     }
 
@@ -163,7 +163,7 @@ const performBotNightActions = async (gameId: number, currentDay: number) => {
 
 // ─── フェーズ終了時の未行動ケア ───
 // 未投票プレイヤーをランダム投票（Bot・人間両方）
-const fillMissingVotes = async (gameId: number, currentDay: number) => {
+const fillMissingVotes = async (io: Server, gameId: number, currentDay: number) => {
   const notVotedResult = await query(
     `SELECT gp.user_id FROM game_players gp
      WHERE gp.game_id = $1 AND gp.is_alive = TRUE
@@ -186,7 +186,8 @@ const fillMissingVotes = async (gameId: number, currentDay: number) => {
     const targetId = options[Math.floor(Math.random() * options.length)];
     await logEvent(gameId, 'day_vote', 'vote', player.user_id, targetId,
       { day: currentDay, isAutoVote: true });
-    // TODO: 未投票システムメッセージ（メモ）
+    broadcastSystemMessage(io, `game:${gameId}`,
+   `⏰ 「${player.handle_name}」は時間内に投票しなかったため、ランダムに投票します`);
   }
 };
 
@@ -215,7 +216,12 @@ const handleMissingNightActions = async (io: Server, gameId: number, currentDay:
     );
     await logEvent(gameId, 'night', 'sudden_death', null, player.user_id, { day: currentDay });
     broadcastPlayerDeath(io, gameId, player.user_id);
-    // TODO: 突然死システムメッセージ（メモ）
+const nameResult = await query(
+  'SELECT handle_name FROM users WHERE id = $1', [player.user_id]
+);
+const name = nameResult.rows[0]?.handle_name ?? '不明';
+broadcastSystemMessage(io, `game:${gameId}`,
+  `💀 「${name}」は夜のうちに行動しなかったため、突然死しました`);
   }
 };
 
