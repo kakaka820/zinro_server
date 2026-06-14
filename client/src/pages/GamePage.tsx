@@ -62,11 +62,15 @@ export default function GamePage() {
   const id = Number(gameId);
 
   const fetchGame = async () => {
-    const res = await api.get<Game>(`/api/games/${id}`);
+    try {const res = await api.get<Game>(`/api/games/${id}`);
     setGame(res.data);
     // リロード後もゲーム終了状態を復元
     if (res.data.status === 'finished' && res.data.winner_faction) {
     setWinner(res.data.winner_faction);
+  }
+    } catch {
+    // ✅ ゲームが見つからない → ロビーへ
+    navigate('/lobby');
   }
   };
 

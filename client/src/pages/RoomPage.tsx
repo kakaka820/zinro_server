@@ -48,7 +48,8 @@ export default function RoomPage() {
       return;
     }
   } catch {
-    setError('ルーム情報の取得に失敗しました');
+    // 村が見つからない（削除済み等）→ ロビーへ
+    navigate('/lobby');
   }
 };
 
