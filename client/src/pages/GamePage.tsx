@@ -56,6 +56,7 @@ export default function GamePage() {
   const [seerResult, setSeerResult] = useState<string | null>(null);
   const [timeLeft, setTimeLeft] = useState<number | null>(null);
   const [actionDone, setActionDone] = useState(false);
+  const [votedFor, setVotedFor] = useState<number | null>(null);
   const [winner, setWinner] = useState<string | null>(null);
   const [error, setError] = useState('');
   const [myBet, setMyBet] = useState<string | null>(null);
@@ -122,6 +123,7 @@ socketRef.current.on('chat_message', (msg: ChatMessage) => {
       setActionDone(false);
       setSeerResult(null);
       setVoteTarget(null);
+      setVotedFor(null);
       setNightTarget(null);
     });
 
@@ -178,7 +180,7 @@ socketRef.current.on('connect', handleConnect);
     if (!voteTarget) return;
     try {
       await api.post(`/api/games/${id}/vote`, { targetId: voteTarget });
-      setActionDone(true);
+      setVotedFor(voteTarget);
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : '投票に失敗しました');
     }
@@ -352,8 +354,9 @@ socketRef.current.on('connect', handleConnect);
             ))}
           </div>
 
-          {/* ─── 投票フェーズ ─── */}
-          {phase === 'day_vote' && isAlive && !actionDone && (
+          {/* ── 投票フェーズ ────*/}
+          {phase === 'day_vote' && isAlive && (
+          
             <div>
               <p style={{ fontSize: 12, color: '#aaa', marginBottom: 6 }}>処刑する人を選んでください</p>
               <select
@@ -366,7 +369,14 @@ socketRef.current.on('connect', handleConnect);
                   <option key={p.user_id} value={p.user_id}>{p.handle_name}</option>
                 ))}
               </select>
-              <button onClick={vote} disabled={!voteTarget}>投票する</button>
+              {votedFor && (
+                <p style={{ fontSize: 12, color: '#7ec8e3', marginBottom: 6 }}>
+                  現在の投票先：
+                  <strong>{game.players.find(p => p.user_id === votedFor)?.handle_name}</strong>
+                  （変更可能）
+                </p>
+              )}
+              <button onClick={vote}>{votedFor ? '投票先を変更する' : '投票する'}</button>
             </div>
           )}
           {phase === 'day_vote' && actionDone && (
