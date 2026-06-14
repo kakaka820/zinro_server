@@ -139,12 +139,22 @@ socketRef.current.on('chat_message', (msg: ChatMessage) => {
 
   useEffect(() => {
   if (!user?.id || !socketRef.current) return;
-  socketRef.current.emit('join_game', {
+  const handleConnect = () => {
+  socketRef.current?.emit('join_game', {
     gameId: id,
     userId: user.id,
     isWolf: false,
   });
-}, [id, user?.id]);
+  fetchGame();
+};
+socketRef.current.on('connect', handleConnect);
+  if (socketRef.current.connected) {
+    socketRef.current.emit('join_game', { gameId: id, userId: user.id, isWolf: false });
+  }
+  return () => {
+    socketRef.current?.off('connect', handleConnect);
+  };
+},[id, user?.id]);
 
   // チャット末尾に自動スクロール
   useEffect(() => {
