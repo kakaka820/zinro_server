@@ -170,9 +170,13 @@ useEffect(() => {
         <span style={{ fontSize: 12, color: '#aaa' }}>
           あなた：<span style={{ color: '#7ec8e3' }}>参加者</span>
         </span>
+        <button onClick={fetchRoom} style={{ fontSize: 12 }}>
+          🔄
+        </button>
         <button onClick={leaveRoom} style={{ fontSize: 12 }}>
           {isLastMember ? '村を閉じる' : '退室'}
         </button>
+        
       </div>
     </div>
 

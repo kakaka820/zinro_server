@@ -217,6 +217,13 @@ socketRef.current.on('chat_message', (msg: ChatMessage) => {
               残り {timeLeft}秒
             </span>
           )}
+          <button
+            onClick={fetchGame}
+            style={{ fontSize: 11, color: '#aaa', borderColor: '#4a4a7a',
+              background: 'transparent', padding: '2px 6px', marginLeft: 8 }}
+          >
+            🔄
+          </button>
         </div>
         <div style={{ fontSize: 12, color: '#aaa' }}>
           あなた：<span style={{ color: '#f4c430' }}>{myRole ?? '...'}</span>
