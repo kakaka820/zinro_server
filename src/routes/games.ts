@@ -99,6 +99,12 @@ router.post('/:id/vote', requireAuth, async (req: Request, res: Response) => {
       res.status(400).json({ error: '死亡プレイヤーは投票できません' }); return;
     }
 
+    await query(
+      `DELETE FROM game_events
+      WHERE game_id = $1 AND phase = 'day_vote' AND event_type = 'vote'
+      AND actor_id = $2 AND (data->>'day')::int = $3`,
+      [gameId, userId, game.current_day]
+    );
     await logEvent(gameId, 'day_vote', 'vote', userId, targetId, { day: game.current_day });
     res.json({ message: '投票しました' });
   } catch (e) {
